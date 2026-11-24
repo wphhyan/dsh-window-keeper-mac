@@ -8,6 +8,30 @@ window.__ModuleLoader__.load({
     /** Profile entry id of this plugin, the settings namespace. */
     const NS = 'window-keeper-mac'
 
+    /** Page text per locale; unknown locales fall back to Chinese. */
+    const STRINGS = {
+      zh: {
+        title: '窗口记忆',
+        status: '状态',
+        reapply: '重新启用',
+        revert: '还原官方包',
+        refresh: '刷新',
+        hint: '打补丁或还原后需要 ⌘Q 重启才生效。',
+        raw: '命名空间原始值',
+        empty: '（暂无状态，点「刷新」重试）',
+      },
+      en: {
+        title: 'Window memory',
+        status: 'Status',
+        reapply: 'Re-enable',
+        revert: 'Restore official bundle',
+        refresh: 'Refresh',
+        hint: 'Restart with ⌘Q after applying or restoring.',
+        raw: 'Raw namespace values',
+        empty: '(No status yet — press Refresh.)',
+      },
+    }
+
     const styles = {
       wrap: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 2px', maxWidth: '760px' },
       card: {
@@ -93,7 +117,7 @@ window.__ModuleLoader__.load({
      * Window memory page inside Settings → Plugins.
      * @param {object} props - slot props plus the lazy remote resolver.
      */
-    function PageView({ remote }) {
+    function PageView({ remote, t }) {
       const [view, setView] = useState(null)
       const [error, setError] = useState(null)
       const [busy, setBusy] = useState(false)
@@ -138,8 +162,8 @@ window.__ModuleLoader__.load({
 
       return h('div', { style: styles.wrap },
         h('div', { style: styles.card },
-          h('div', { style: styles.label }, '状态'),
-          h('div', { style: styles.status }, status === '' ? '（暂无状态，点「刷新」重试）' : status),
+          h('div', { style: styles.label }, t('status')),
+          h('div', { style: styles.status }, status === '' ? t('empty') : status),
           details === '' ? null : h('div', { style: styles.detail }, details),
         ),
         h('div', { style: styles.row },
@@ -147,22 +171,22 @@ window.__ModuleLoader__.load({
             style: styleFor(styles.button),
             disabled: busy,
             onClick: () => void write({ reapplyNow: true }),
-          }, '重新启用'),
+          }, t('reapply')),
           h('button', {
             style: styleFor(styles.danger),
             disabled: busy,
             onClick: () => void write({ revertNow: true }),
-          }, '还原官方包'),
+          }, t('revert')),
           h('button', {
             style: styleFor(styles.button),
             disabled: busy,
             onClick: () => void load(),
-          }, '刷新'),
-          h('span', { style: styles.hint }, '打补丁或还原后需要 ⌘Q 重启才生效。'),
+          }, t('refresh')),
+          h('span', { style: styles.hint }, t('hint')),
         ),
         error === null ? null : h('div', { style: styles.error }, error),
         view === null ? null : h('details', {},
-          h('summary', { style: styles.hint }, '命名空间原始值'),
+          h('summary', { style: styles.hint }, t('raw')),
           h('pre', { style: styles.pre }, JSON.stringify(values, undefined, 2)),
         ),
       )
@@ -176,12 +200,25 @@ window.__ModuleLoader__.load({
           if (typeof ctx.get === 'function') return ctx.get('remote')
           return undefined
         }
-        const Page = () => h(PageView, { remote })
+
+        // The tab label and page text follow the host locale when the locale
+        // service is available; otherwise Chinese is used.
+        let t = key => STRINGS.zh[key] ?? key
+        try {
+          const locale = typeof ctx.get === 'function' ? ctx.get('locale') : undefined
+          if (locale !== undefined && typeof locale.register === 'function' && typeof locale.bind === 'function') {
+            locale.register(NS, { zh: STRINGS.zh, en: STRINGS.en })
+            const bound = locale.bind(NS)
+            t = key => bound(key)
+          }
+        } catch {}
+
+        const Page = () => h(PageView, { remote, t })
         ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
           name: 'settings.plugins.tab',
           id: 'window-keeper-mac',
           order: 55,
-          label: '窗口记忆',
+          label: () => t('title'),
         }, Page))
       },
     }

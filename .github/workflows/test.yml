@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Engine tests on synthetic archives
+        run: node test/patch.test.mjs
+      - name: Manifest and JSON syntax
+        run: |
+          node -e "const fs=require('node:fs');for (const f of ['package.json','locale/en.json','locale/zh.json']) JSON.parse(fs.readFileSync(f,'utf8'));console.log('json ok')"
+          node -e "const fs=require('node:fs');const y=fs.readFileSync('cordis.patch.yml','utf8');if(!y.includes('- insert:')) throw new Error('patch missing insert');console.log('patch ok')"
+      - name: Package contents
+        run: npm pack --dry-run

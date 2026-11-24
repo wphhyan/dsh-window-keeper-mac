@@ -57,9 +57,9 @@ export const Config = z.object({
   revertNow: z.boolean().default(false).volatile()
     .description('「还原」开关：打开后立即还原本插件保存的官方 app.asar，完成或失败后自动关闭。'),
   status: z.string().default('').volatile()
-    .description('只读状态：最近一次检查或操作的结果，由插件写回，无需编辑。'),
+    .description('只读（由插件写回，手改会被下一次刷新覆盖）：最近一次检查或操作的结果。'),
   details: z.string().default('').volatile()
-    .description('只读：存档尺寸、最近一次恢复时间与可回滚备份。'),
+    .description('只读（由插件写回，手改会被下一次刷新覆盖）：存档尺寸、最近一次恢复时间与可回滚备份。'),
 })
 
 const BACKUP_SUFFIX = '.window-keeper.bak'
