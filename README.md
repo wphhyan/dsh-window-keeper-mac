@@ -1,82 +1,84 @@
 # dsh-window-keeper-mac
 
-Remember the DeepSeek Harness desktop window size on macOS: it restores the geometry you left behind on the next launch, and after a DSH upgrade replaces the app bundle, one switch in settings re-applies the support patch.
+[简体中文](README.md) | [English](README.en.md)
+
+让 macOS 上的 DSH 桌面版记住主窗口尺寸：下次启动恢复上次关闭时的几何；DSH 升级覆盖应用包后，在设置里点一个开关就能重新启用支持补丁。
 
 ![platform](https://img.shields.io/badge/platform-macOS-000000)
 ![DSH](https://img.shields.io/badge/DSH-%E2%89%A50.2.2--rc.1-4B6BFB)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-## The problem
+## 为什么需要补丁
 
-The DSH desktop shell creates its main window with a hard-coded geometry and never records it, so every launch snaps back to 1280×820. Electron only lets the **main process** create and resize that window, and a DSH plugin runs in the desktop host child process — it cannot reach a `BrowserWindow`. On macOS an external helper cannot resize another application's window without the Accessibility permission, which most users have not granted and which cannot be requested reliably from a plugin.
+DSH 桌面壳创建主窗口时把几何写死、也从不记录，所以每次启动都回到 1280×820。Electron 只允许**主进程**创建和调整窗口，而 DSH 插件运行在 desktop host 子进程里，摸不到 `BrowserWindow`。macOS 上外部进程想改别的应用窗口，需要「辅助功能」授权，插件既无法可靠申请、用户多数也没开过。
 
-So this plugin does the only thing that works without system permissions: it keeps a small, version-independent patch in the shell's `lib/main.js` that records the window geometry on close/quit and applies it before the window is created, and it owns everything around that patch — detecting when a DSH upgrade silently removed it, re-applying it, verifying the result, and keeping a pristine backup.
+所以这个插件做目前唯一无需系统授权的事：在应用壳的 `lib/main.js` 里维护一小段与版本无关的补丁——关闭/退出时记录几何，创建窗口前套用——并负责补丁之外的一切：发现 DSH 升级把它覆盖了、一键重打、校验、保留官方备份、支持一键还原。
 
-## What it does
+## 功能
 
-- **Restore**: on every launch, the saved normal bounds and maximized flag are applied before the window is created, so there is no "small window first, then jumps" flash. Saves are debounced on move/resize/maximize, and captured immediately on close and quit.
-- **Detect**: after a DSH upgrade replaces `app.asar`, the settings status line says the patch is gone (and from which version it disappeared).
-- **Re-apply**: turn on `reapplyNow` in Settings → Plugins → Window memory. The patch is rebuilt from the live `lib/main.js`, verified, installed, and the status says a restart is needed.
-- **Verify**: the rebuilt archive is read back with **Electron's own asar reader** (not the plugin's parser), and after the rename its SHA-256 is compared with the staged file.
-- **Revert**: `revertNow`, or the `window_keeper` tool with `action: "revert"`, restores the pristine `app.asar` this plugin saved. Restores are refused when the backup no longer matches the running version.
+- **恢复**：每次启动在创建窗口之前应用上次的普通窗口尺寸与最大化标记，不会先弹小窗再跳；移动/缩放/最大化去抖保存，关窗与退出立即落盘。
+- **检测**：DSH 升级替换 `app.asar` 后，设置里的状态行会说明补丁已不在（以及上次是哪个版本）。
+- **重打**：打开 `reapplyNow` 开关，插件从当前 `lib/main.js` 重建补丁、校验、安装，并提示需要重启。
+- **校验**：用 **Electron 自己的 asar 读取器**（不是本插件自己的解析器）复核临时归档；rename 之后再比对整包 SHA-256。
+- **还原**：`revertNow` 开关，或工具 `window_keeper` 的 `action: "revert"`，把本插件保存的官方 `app.asar` 放回；备份与当前版本不匹配时拒绝还原。
 
-## Install
+## 安装
 
-From the plugin market entry, or from this repository:
+从市场条目安装，或：
 
 ```sh
 dsh plugin --profile desktop add github:wphhyan/dsh-window-keeper-mac
 ```
 
-The desktop app also accepts a local directory through **Settings → Plugins → Add plugin**.
+桌面版也可以在 **设置 → 插件 → 添加插件** 里选择本地目录。
 
-## Settings
+## 设置
 
-**Settings → Plugins → Window memory** (a tab of its own, plus the automatic config form):
+**设置 → 插件 → 窗口记忆**（独立页签 + 自动生成的配置表单）：
 
-| Field | Meaning |
+| 字段 | 含义 |
 | --- | --- |
-| `reapplyNow` | Re-enable switch. Applies the patch immediately; resets itself afterwards and writes the outcome to `status`. |
-| `revertNow` | Restore switch. Restores the saved pristine `app.asar`; resets itself. |
-| `autoReapply` | Off by default. When on, a launch that finds the patch missing re-applies it automatically (a restart is still needed). |
-| `status` / `details` | Read-only outcome line and geometry summary (saved bounds, last restore, backup). |
-| `appPath` | Bundle path; empty means autodetect from the running executable. |
+| `reapplyNow` | 重新启用开关。打开后立即打补丁，结束（成功或失败）自动复位，结果写入 `status`。 |
+| `revertNow` | 还原开关。打开后立即还原官方 `app.asar`，结束后自动复位。 |
+| `autoReapply` | 默认关。打开后，启动时若发现补丁缺失会自动重打（仍需重启生效）。 |
+| `status` / `details` | 只读：最近一次结果、存档尺寸、最近一次恢复、可回滚备份。 |
+| `appPath` | 应用包路径；留空则从运行中的可执行文件自动定位。 |
 
-The `window_keeper` tool offers the same operations to the agent: `status`, `apply`, `revert`.
+工具 `window_keeper` 向 agent 提供同样的操作：`status`、`apply`、`revert`。
 
-## Safety and what it changes
+## 安全性与它改了什么
 
-- It writes **only** `Contents/Resources/app.asar`, and only when you turn a switch on, or when `autoReapply` is on and the patch is missing.
-- Before the first install it copies the current archive to `app.asar.window-keeper.bak`. A backup from another version is never used to overwrite a newer build.
-- The write goes to a sibling staging archive, is verified, and is then renamed into place atomically. A crash leaves at most a stray staging file.
-- Verified on install: `node --check` syntax, exactly one patch region, every other archive entry byte-identical, payload base unchanged, Electron's reader opens the staged archive, and the post-rename SHA-256 matches.
-- Rollback at any time:
+- 只写 `Contents/Resources/app.asar`，且只在你打开开关时（或 `autoReapply` 打开且补丁缺失时）才写。
+- 首次安装前把当前归档复制为 `app.asar.window-keeper.bak`；别的版本的备份绝不会被用来覆盖新版本。
+- 写入走同目录临时归档 → 校验 → 原子 rename；中途崩溃最多留下一个临时文件。
+- 安装时校验：`node --check` 语法、注入区恰好 1 处、除 `lib/main.js` 外所有条目逐字节一致、数据区基址不变、Electron 读取器能打开临时归档、rename 后 SHA-256 与暂存文件一致。
+- 随时回滚：
 
   ```sh
   cp "/Applications/DeepSeek Harness.app/Contents/Resources/app.asar.window-keeper.bak" \
      "/Applications/DeepSeek Harness.app/Contents/Resources/app.asar"
   ```
 
-## Limitations
+## 限制
 
-- **macOS only.** On other platforms the plugin reports `not-found` and does nothing.
-- Modifying `app.asar` invalidates the application's code signature. The app still launches on macOS, but macOS may show a signature warning, and DSH's own updater may refuse or re-sign the bundle on the next update — that update also removes the patch, which is what the re-enable switch is for. This plugin does not call `codesign`.
-- Requires write permission on `/Applications/DeepSeek Harness.app`. A per-machine install owned by the user works; a root-owned installation needs an administrative action the plugin does not perform.
-- If a future DSH release turns on Electron's embedded asar integrity validation, a patched bundle will not start. Check the status before enabling the switch after an upgrade; the plugin refuses to install an archive Electron cannot read, but it cannot change the shell's own integrity policy.
-- Uninstalling the plugin does not remove the patch. Revert first, then uninstall.
-- The patch only records the primary window; the welcome window, update dialog, and embedded platform views are not tracked.
-- A crash or `kill -9` can lose at most the last 400 ms of window adjustments.
+- **仅 macOS**。其他平台报告 `not-found`，不做任何写入。
+- 修改 `app.asar` 会让应用签名失效。macOS 上应用仍可启动，但可能出现签名告警；DSH 自己的更新器也可能拒绝更新或重新签名——那次更新同样会覆盖补丁，这正是「重新启用」开关存在的理由。本插件不调用 `codesign`。
+- 需要对 `/Applications/DeepSeek Harness.app` 的写权限。属于当前用户的安装可以直接写；root 所有的安装需要管理员操作，本插件不做。
+- 若将来的 DSH 版本开启 Electron 内嵌 asar 完整性校验，打过补丁的应用将无法启动。升级后先看状态再点开关：插件会拒绝安装 Electron 读不了的归档，但无法改变壳自身的完整性策略。
+- 卸载插件不会移除补丁。先还原，再卸载。
+- 只记录 primary 窗口；欢迎窗、更新弹窗、内嵌平台视图不记录。
+- 崩溃或强杀最多丢失最后 400 ms 的窗口调整。
 
-## Why not a helper process?
+## 为什么不像 Windows 插件那样用辅助进程
 
-Windows plugins in this space watch and resize the window from a small helper process. macOS does not allow that without Accessibility permission, so the main-process patch is the only route that needs no special permission. The trade-off: a DSH upgrade replaces the file, hence the re-enable switch instead of a background service.
+Windows 上的同类插件用一个小辅助进程监视并调整窗口；macOS 不允许这样做（需要辅助功能授权）。主进程补丁是唯一不需要特殊授权的路径，代价是 DSH 升级会覆盖它——所以用「重新启用」开关而不是后台常驻服务。
 
-See [docs/UPSTREAM-IPC.md](docs/UPSTREAM-IPC.md) for the desktop API this plugin would use if the shell ever exposes window geometry to plugins — then the patch would no longer be needed.
+如果 DSH 桌面壳将来把窗口几何开放给插件，本插件就可以退化为纯插件、不再改应用包。接口提案见 [docs/UPSTREAM-IPC.md](docs/UPSTREAM-IPC.md)。
 
-## Requirements
+## 环境要求
 
-DSH Desktop for macOS, 0.2.2-rc.1 or newer (`engines.dsh`). Node 22+ is only needed for local development.
+macOS 上的 DSH 桌面版 0.2.2-rc.1 或更新（`engines.dsh`）。只有本地开发才需要 Node 22+。
 
-## License
+## 许可
 
 MIT
