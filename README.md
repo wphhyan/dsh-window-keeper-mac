@@ -1,6 +1,6 @@
 # dsh-window-keeper-mac
 
-[简体中文](README.md) | [English](README.en.md)
+**简体中文** | [English](README.en.md)
 
 让 macOS 上的 DSH 桌面版记住主窗口尺寸：下次启动恢复上次关闭时的几何；DSH 升级覆盖应用包后，在设置里点一个开关就能重新启用支持补丁。
 

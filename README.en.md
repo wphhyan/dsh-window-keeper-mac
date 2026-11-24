@@ -1,6 +1,6 @@
 # dsh-window-keeper-mac
 
-[English](README.en.md) | [简体中文](README.md)
+[简体中文](README.md) | **English**
 
 Remember the DeepSeek Harness desktop window size on macOS: it restores the geometry you left behind on the next launch, and after a DSH upgrade replaces the app bundle, one switch in settings re-applies the support patch.
 
