@@ -258,7 +258,7 @@ export function apply(ctx, config) {
    * @param {string} reason - trigger that woke this pass.
    * @returns {Promise<void>} completion.
    */
-  const refresh = async reason => {
+  const refresh = async (reason, attempt = 0) => {
     if (busy) return
     busy = true
     try {
@@ -275,29 +275,29 @@ export function apply(ctx, config) {
         const outcome = revertPatch()
         current = report()
         remember(outcome.message, current.state)
-        await writeConfig({
+        await persist({
           status: line(current, outcome.message),
           details: detailLine(current),
           revertNow: false,
-        })
+        }, attempt)
         return
       }
       if (switchOn) {
         const outcome = patchNow('switch')
         current = report()
         remember(outcome.message, current.state)
-        await writeConfig({
+        await persist({
           status: line(current, outcome.message),
           details: detailLine(current),
           reapplyNow: false,
-        })
+        }, attempt)
         return
       }
       if (current.state === 'absent' && read('autoReapply') === true) {
         const outcome = patchNow('auto')
         current = report()
         remember(outcome.message, current.state)
-        await writeConfig({ status: line(current, outcome.message), details: detailLine(current) })
+        await persist({ status: line(current, outcome.message), details: detailLine(current) }, attempt)
         return
       }
       const patch = {}
@@ -305,10 +305,11 @@ export function apply(ctx, config) {
       const nextDetails = detailLine(current)
       if (read('status') !== nextStatus) patch.status = nextStatus
       if (read('details') !== nextDetails) patch.details = nextDetails
-      if (Object.keys(patch).length > 0) await writeConfig(patch)
+      if (Object.keys(patch).length > 0) await persist(patch, attempt)
     } catch (error) {
       trace(`refresh(${reason}) failed: ${error?.stack ?? String(error)}`)
       await writeConfig({ status: `窗口记忆检查失败：${error?.message ?? String(error)}` })
+      scheduleRetry(attempt + 1)
     } finally {
       busy = false
     }
@@ -359,6 +360,33 @@ export function apply(ctx, config) {
    */
   const remember = (message, state) => {
     writeState({ lastMessage: message, lastMessageAt: new Date().toISOString(), lastMessageState: state })
+  }
+
+  /**
+   * Retry a refresh after a failed config write, with a short backoff.
+   * The profile's package.json is locked during plugin installation, so the
+   * first write after a swap can legitimately time out.
+   * @param {number} attempt - retry number, 1-based.
+   */
+  const scheduleRetry = attempt => {
+    if (attempt > 3) return
+    if (timer !== undefined) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = undefined
+      void refresh(`retry${attempt}`, attempt)
+    }, 1500 * attempt)
+  }
+
+  /**
+   * Persist the plugin's fields and schedule a retry when the write is refused.
+   * @param {object} patch - fields to merge.
+   * @param {number} attempt - current refresh attempt.
+   * @returns {Promise<boolean>} whether the write was accepted.
+   */
+  const persist = async (patch, attempt) => {
+    const written = await writeConfig(patch)
+    if (!written) scheduleRetry(attempt + 1)
+    return written
   }
 
   const schedule = reason => {
