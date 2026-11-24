@@ -49,6 +49,7 @@ dsh plugin --profile desktop add github:wphhyan/dsh-window-keeper-mac
 ## 安全性与它改了什么
 
 - 只写 `Contents/Resources/app.asar`，且只在你打开开关时（或 `autoReapply` 打开且补丁缺失时）才写。
+- **只允许操作当前运行的这个应用包**：`appPath` 指向别的 Electron 应用时会被拒绝，不会去改别人的安装。
 - 首次安装前把当前归档复制为 `app.asar.window-keeper.bak`；别的版本的备份绝不会被用来覆盖新版本。
 - 写入走同目录临时归档 → 校验 → 原子 rename；中途崩溃最多留下一个临时文件。
 - 安装时校验：`node --check` 语法、注入区恰好 1 处、除 `lib/main.js` 外所有条目逐字节一致、数据区基址不变、Electron 读取器能打开临时归档、rename 后 SHA-256 与暂存文件一致。
@@ -74,6 +75,14 @@ dsh plugin --profile desktop add github:wphhyan/dsh-window-keeper-mac
 Windows 上的同类插件用一个小辅助进程监视并调整窗口；macOS 不允许这样做（需要辅助功能授权）。主进程补丁是唯一不需要特殊授权的路径，代价是 DSH 升级会覆盖它——所以用「重新启用」开关而不是后台常驻服务。
 
 如果 DSH 桌面壳将来把窗口几何开放给插件，本插件就可以退化为纯插件、不再改应用包。接口提案见 [docs/UPSTREAM-IPC.md](docs/UPSTREAM-IPC.md)。
+
+## 测试
+
+```sh
+npm test
+```
+
+用合成的小归档验证四个行为：打补丁的确定性、还原字节一致、缺锚点时拒绝、已打过补丁时拒绝重复打。`ELECTRON_RUN_AS_NODE=1 <Electron 可执行文件> test/patch.test.mjs` 会额外走 Electron 自己的 asar 读取器。
 
 ## 环境要求
 

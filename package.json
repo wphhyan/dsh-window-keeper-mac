@@ -1,6 +1,6 @@
 {
   "name": "dsh-window-keeper-mac",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Restore the last DSH desktop window size on macOS, and re-apply the main-process patch after a DSH upgrade with one settings switch.",
   "type": "module",
   "license": "MIT",
@@ -51,5 +51,8 @@
     "client": {
       "platform": "web"
     }
+  },
+  "scripts": {
+    "test": "node test/patch.test.mjs"
   }
 }

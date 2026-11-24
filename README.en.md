@@ -49,6 +49,7 @@ The `window_keeper` tool offers the same operations to the agent: `status`, `app
 ## Safety and what it changes
 
 - It writes **only** `Contents/Resources/app.asar`, and only when you turn a switch on, or when `autoReapply` is on and the patch is missing.
+- **Only the bundle this app currently runs from can be patched**: an `appPath` pointing at another Electron app is refused, so the plugin cannot modify a different installation.
 - Before the first install it copies the current archive to `app.asar.window-keeper.bak`. A backup from another version is never used to overwrite a newer build.
 - The write goes to a sibling staging archive, is verified, and is then renamed into place atomically. A crash leaves at most a stray staging file.
 - Verified on install: `node --check` syntax, exactly one patch region, every other archive entry byte-identical, payload base unchanged, Electron's reader opens the staged archive, and the post-rename SHA-256 matches.
@@ -74,6 +75,14 @@ The `window_keeper` tool offers the same operations to the agent: `status`, `app
 Windows plugins in this space watch and resize the window from a small helper process. macOS does not allow that without Accessibility permission, so the main-process patch is the only route that needs no special permission. The trade-off: a DSH upgrade replaces the file, hence the re-enable switch instead of a background service.
 
 See [docs/UPSTREAM-IPC.md](docs/UPSTREAM-IPC.md) for the desktop API this plugin would use if the shell ever exposes window geometry to plugins — then the patch would no longer be needed.
+
+## Tests
+
+```sh
+npm test
+```
+
+Four checks on synthetic archives: deterministic patch output, byte-identical revert, refusal without the expected anchors, and refusal when a patch is already present. Running `ELECTRON_RUN_AS_NODE=1 <electron> test/patch.test.mjs` additionally exercises Electron's own asar reader.
 
 ## Requirements
 

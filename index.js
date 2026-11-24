@@ -107,6 +107,36 @@ function renderReport(value) {
  */
 export function apply(ctx, config) {
   const scratch = path.join(pluginDataDirectory(), 'tmp')
+  /** Real bundle path of the running desktop app; undefined outside an app bundle. */
+  const ownBundle = (() => {
+    const exec = process.execPath ?? ''
+    if (!exec.includes('.app/Contents/MacOS/')) return undefined
+    try {
+      return fs.realpathSync(path.resolve(exec, '../../..'))
+    } catch {
+      return undefined
+    }
+  })()
+
+  /**
+   * Refuse to touch any bundle other than the one this Host runs from.
+   * The patch rewrites application code, so a misconfigured path must never
+   * reach another installed app.
+   * @param {string} bundle - bundle path from the report.
+   * @returns {string | undefined} refusal message, or undefined when allowed.
+   */
+  const bundleGuard = bundle => {
+    const resolved = (() => {
+      try {
+        return fs.realpathSync(path.resolve(bundle))
+      } catch {
+        return path.resolve(bundle)
+      }
+    })()
+    if (ownBundle === undefined) return '拒绝：当前进程不在桌面应用包内，无法安全改写归档'
+    if (resolved !== ownBundle) return `拒绝：只能操作运行中的桌面应用（${ownBundle}）`
+    return undefined
+  }
   /** How long one operation's outcome stays in the status line. */
   const MESSAGE_TTL_MS = 10 * 60 * 1000
   let busy = false
@@ -192,6 +222,8 @@ export function apply(ctx, config) {
     if (current.state === 'unpatchable') {
       return { ok: false, message: `无法适配：${current.notes}` }
     }
+    const refusal = bundleGuard(current.appPath)
+    if (refusal !== undefined) return { ok: false, message: refusal }
     const asarPath = path.join(current.appPath, 'Contents', 'Resources', 'app.asar')
     const backupPath = `${asarPath}${BACKUP_SUFFIX}`
     const state = readState()
@@ -234,6 +266,8 @@ export function apply(ctx, config) {
     const current = report()
     if (current.appPath === '') return { ok: false, message: '未找到桌面应用包' }
     if (current.state === 'absent') return { ok: true, message: '当前就是官方版本，没有需要还原的补丁' }
+    const refusal = bundleGuard(current.appPath)
+    if (refusal !== undefined) return { ok: false, message: refusal }
     const asarPath = path.join(current.appPath, 'Contents', 'Resources', 'app.asar')
     const state = readState()
     const backupPath = state.backupPath ?? `${asarPath}${BACKUP_SUFFIX}`
@@ -335,7 +369,8 @@ export function apply(ctx, config) {
         tail = stored.lastMessage
       }
     }
-    return `${head}${geometry}${tail === '' ? '' : ` ${tail}`}`
+    const text = `${head}${geometry}${tail === '' ? '' : ` ${tail}`}`
+    return text.length <= 240 ? text : `${text.slice(0, 239)}…`
   }
 
   /**
