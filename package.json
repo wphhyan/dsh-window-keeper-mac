@@ -1,0 +1,54 @@
+{
+  "name": "dsh-window-keeper-mac",
+  "version": "0.5.0",
+  "description": "Restore the last DSH desktop window size on macOS, and re-apply the main-process patch after a DSH upgrade with one settings switch.",
+  "type": "module",
+  "license": "MIT",
+  "author": "wphhyan",
+  "homepage": "https://github.com/wphhyan/dsh-window-keeper-mac#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wphhyan/dsh-window-keeper-mac.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wphhyan/dsh-window-keeper-mac/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek-harness",
+    "macos",
+    "window",
+    "window-state",
+    "electron"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": ">=3.18.0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib",
+    "locale/*.json",
+    "docs",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

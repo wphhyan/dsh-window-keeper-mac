@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "窗口记忆",
+    "description": "检查、重打或还原 DeepSeek Harness 桌面版的窗口尺寸记忆。窗口几何由 app.asar 内的 Electron 主进程补丁保存与恢复；DSH 升级会覆盖该文件，本插件负责发现失效、在设置里用开关一键重打、校验，并保留官方备份以便一步还原。",
+    "detail": "docs/DETAIL.md"
+  }
+}

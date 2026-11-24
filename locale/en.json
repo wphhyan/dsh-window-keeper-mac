@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Window memory",
+    "description": "Check, re-apply, or revert DeepSeek Harness Desktop window-size memory. The window geometry is saved and restored by an Electron main-process patch inside app.asar; a DSH upgrade replaces that file, and this plugin detects that, re-installs the patch from a settings switch, verifies it, and keeps a pristine backup for a one-step revert.",
+    "detail": "docs/DETAIL.md"
+  }
+}
