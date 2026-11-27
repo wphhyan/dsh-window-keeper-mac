@@ -11,7 +11,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { inspectWindowKeeper } from './lib/status.js'
+import { backupVersionFor, inspectWindowKeeper } from './lib/status.js'
 import {
   PatchError,
   installIntoArchive,
@@ -190,6 +190,31 @@ export function apply(ctx, config) {
   })
 
   /**
+   * Adopt a patch that exists on disk but has no state entry.
+   *
+   * Renaming the package, restoring a profile, or installing this plugin after
+   * the Python installer all leave a patched archive with an empty state file;
+   * without adoption "restore official" would refuse because the backup version
+   * is unknown.
+   * @param {object} current - inspection report.
+   * @returns {{ adopted: boolean, version?: string }} adoption outcome.
+   */
+  const adoptExistingPatch = current => {
+    if (current.state !== 'enabled' || current.appPath === '') return { adopted: false }
+    const state = readState()
+    if (typeof state.backupVersion === 'string' && state.backupVersion !== '') return { adopted: false }
+    const asarPath = path.join(current.appPath, 'Contents', 'Resources', 'app.asar')
+    const backupPath = `${asarPath}${BACKUP_SUFFIX}`
+    if (!fs.existsSync(backupPath)) return { adopted: false }
+    const version = backupVersionFor(backupPath, current.appVersion)
+    if (version === undefined) return { adopted: false }
+    if (!isBaselineFor(backupPath, asarPath)) return { adopted: false }
+    writeState({ backupPath, backupVersion: version, lastResult: 'adopted' })
+    trace(`adopted existing patch: ${version}`)
+    return { adopted: true, version }
+  }
+
+  /**
    * Persist the plugin's own volatile fields without touching the user's patch file.
    * @param {object} patch - fields to merge into this entry's config.
    * @returns {Promise<boolean>} whether the write was accepted.
@@ -217,7 +242,13 @@ export function apply(ctx, config) {
     const current = report()
     if (current.appPath === '') return { ok: false, message: '未找到桌面应用包，无法打补丁' }
     if (current.state === 'enabled') {
-      return { ok: true, message: `补丁已在位（${current.appVersion}），无需重打` }
+      const adoption = adoptExistingPatch(current)
+      return {
+        ok: true,
+        message: adoption.adopted
+          ? `补丁已在位（${current.appVersion}），已接管现有备份信息`
+          : `补丁已在位（${current.appVersion}），无需重打`,
+      }
     }
     if (current.state === 'unpatchable') {
       return { ok: false, message: `无法适配：${current.notes}` }
@@ -271,8 +302,12 @@ export function apply(ctx, config) {
     const asarPath = path.join(current.appPath, 'Contents', 'Resources', 'app.asar')
     const state = readState()
     const backupPath = state.backupPath ?? `${asarPath}${BACKUP_SUFFIX}`
-    if (state.backupVersion !== current.appVersion) {
-      return { ok: false, message: `备份属于 ${state.backupVersion ?? '未知版本'}，与当前 ${current.appVersion} 不一致，拒绝还原` }
+    let backupVersion = state.backupVersion
+    if (backupVersion === null || backupVersion === undefined) {
+      backupVersion = adoptExistingPatch(current).version ?? backupVersion
+    }
+    if (backupVersion !== current.appVersion) {
+      return { ok: false, message: `备份属于 ${backupVersion ?? '未知版本'}，与当前 ${current.appVersion} 不一致，拒绝还原` }
     }
     if (!isBaselineFor(backupPath, asarPath)) {
       return { ok: false, message: '备份与当前应用包的其他条目不一致，拒绝还原' }
@@ -297,6 +332,7 @@ export function apply(ctx, config) {
     busy = true
     try {
       let current = report()
+      if (current.state === 'enabled') adoptExistingPatch(current)
       if (reason === 'activate') {
         // An operation message belongs to the session that ran it; a fresh
         // activation starts with a clean status line.

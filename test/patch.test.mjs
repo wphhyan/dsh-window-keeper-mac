@@ -13,6 +13,7 @@ import path from 'node:path'
 import { buildArchive, PRISTINE_MAIN, UNPATCHABLE_MAIN } from './synthetic-asar.mjs'
 import { installIntoArchive, patchSource, prepareBackup, revertFromBackup } from '../lib/patch.js'
 import { readAsarEntry, withPlainFs } from '../lib/asar.js'
+import { backupVersionFor } from '../lib/status.js'
 import { MARKER } from '../lib/region.js'
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'window-keeper-test-'))
@@ -90,7 +91,12 @@ try {
     'a patched archive is not patched twice',
   )
 
-  console.log(`ok: 4 engine checks passed (${process.versions.electron === undefined ? 'node reader' : 'electron reader'})`)
+  // 5. a backup only counts for the running version — the adoption path relies on it
+  const versioned = fixture(PRISTINE_MAIN, 'versioned')
+  assert.equal(backupVersionFor(versioned.asar, '0.0.0'), '0.0.0', 'matching backup version is accepted')
+  assert.equal(backupVersionFor(versioned.asar, '9.9.9'), undefined, 'a different app version is rejected')
+
+  console.log(`ok: 5 engine checks passed (${process.versions.electron === undefined ? 'node reader' : 'electron reader'})`)
 } finally {
   fs.rmSync(root, { recursive: true, force: true })
 }

@@ -27,6 +27,10 @@ DSH 桌面壳创建主窗口时把几何写死、也从不记录，所以每次�
 从市场条目安装，或：
 
 ```sh
+# npm 包（推荐）
+dsh plugin --profile desktop add dsh-window-keeper-mac
+
+# 或直接从 GitHub 仓库
 dsh plugin --profile desktop add github:wphhyan/dsh-window-keeper-mac
 ```
 

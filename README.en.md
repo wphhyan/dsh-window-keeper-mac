@@ -24,9 +24,13 @@ So this plugin does the only thing that works without system permissions: it kee
 
 ## Install
 
-From the plugin market entry, or from this repository:
+From the plugin market entry, or:
 
 ```sh
+# npm package (recommended)
+dsh plugin --profile desktop add dsh-window-keeper-mac
+
+# or straight from this repository
 dsh plugin --profile desktop add github:wphhyan/dsh-window-keeper-mac
 ```
 
